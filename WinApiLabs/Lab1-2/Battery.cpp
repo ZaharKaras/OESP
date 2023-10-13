@@ -1,4 +1,4 @@
-#include "Battery.h"
+﻿#include "Battery.h"
 
 Battery::Battery() {
 	SYSTEM_POWER_STATUS status;
@@ -48,6 +48,10 @@ string Battery::getSavingMode(SYSTEM_POWER_STATUS status) {
 	return "off";
 }
 
+int Battery::getPercent()
+{
+	return percent;
+}
 
 string BatteryStatus(Battery battery)
 {
@@ -62,3 +66,4 @@ string BatteryStatus(Battery battery)
 
 	return oss.str();
 }
+

@@ -17,5 +17,6 @@ public:
 	string getPowerSupply(SYSTEM_POWER_STATUS status);
 	string getStateCharge(SYSTEM_POWER_STATUS status);
 	string getSavingMode(SYSTEM_POWER_STATUS status);
+	int getPercent();
 	friend string BatteryStatus(Battery battery);
 };

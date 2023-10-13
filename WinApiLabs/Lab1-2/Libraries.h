@@ -9,3 +9,8 @@
 #include <Setupapi.h>
 #include <devguid.h>
 #include <sstream>
+#include <objidl.h>
+#include <gdiplus.h>
+#include <fstream>
+#include <chrono>
+#include <ctime>
