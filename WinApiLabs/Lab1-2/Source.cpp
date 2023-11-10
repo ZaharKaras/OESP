@@ -5,8 +5,6 @@ processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 #include "libraries.h"
 #include "Battery.h"
 
-
-
 void MainWndAddWidgets(HWND hWnd);
 void MainWndAddButton(HWND hWnd);
 LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -65,7 +63,7 @@ void SaveBatteryStateToFile(int percent)
 {
 	// Отображаем файл в память
 	size_t fileSize = 0;
-	void* mappedFile = MapFileToMemory("D:\1\test.txt", fileSize);
+	void* mappedFile = MapFileToMemory("battery_state.txt", fileSize);
 	if (mappedFile == nullptr)
 	{
 		// Обработка ошибки отображения файла в память
@@ -74,7 +72,7 @@ void SaveBatteryStateToFile(int percent)
 
 	// Открываем файл для записи
 	FILE* file = nullptr;
-	if (fopen_s(&file, "D:\1\test.txt", "a") != 0)
+	if (fopen_s(&file, "battery_state.txt", "a") != 0)
 	{
 		// Обработка ошибки открытия файла для записи
 		UnmapViewOfFile(mappedFile);
@@ -93,6 +91,42 @@ void SaveBatteryStateToFile(int percent)
 	// Закрываем файл и освобождаем отображение файла
 	fclose(file);
 	UnmapViewOfFile(mappedFile);
+}
+
+void SaveBatteryStateToEventLog(int percent)
+{
+	HANDLE hEventLog = RegisterEventSource(NULL, L"YourApplicationName");
+
+	if (hEventLog != NULL)
+	{
+		std::wstring message = L"Battery Percent: " + std::to_wstring(percent);
+
+		const wchar_t* strings[1] = { message.c_str() };
+
+		ReportEvent(hEventLog, EVENTLOG_INFORMATION_TYPE, 0, 0, NULL, 1, 0, strings, NULL);
+
+		DeregisterEventSource(hEventLog);
+	}
+}
+
+void WriteRegistryStringValue(int percent)
+{
+	HKEY hKey;
+
+	// Создать/открыть ключ
+	LONG result = RegCreateKeyEx(HKEY_CURRENT_USER, L"Software\\BatteryStateLab", 0, nullptr, 0, KEY_WRITE, nullptr, &hKey, nullptr);
+	if (result != ERROR_SUCCESS) {
+		MessageBox(nullptr, L"Ошибка при создании/открытии ключа в Реестре", L"Ошибка", MB_ICONERROR | MB_OK);
+		return;
+	}
+
+	// Записать значение
+	result = RegSetValueEx(hKey, L"Percent", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&percent), sizeof(DWORD));
+	if (result != ERROR_SUCCESS) {
+		MessageBox(nullptr, L"Ошибка при записи значения в Реестр", L"Ошибка", MB_ICONERROR | MB_OK);
+	}
+
+	RegCloseKey(hKey);
 }
 
 void OnPaint(HDC hdc)
@@ -164,7 +198,7 @@ void CreateLogsWindow()
 {
 	SetWindowTextA(logsWindow, " ");
 
-	std::ifstream file("D:\1\test.txt");
+	std::ifstream file("battery_state.txt");
 	if (file.is_open())
 	{
 		std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
@@ -323,7 +357,8 @@ DWORD WINAPI Power(LPVOID lpParameter)
 		if (battery.getPercent() != startPercent)
 		{
 			SaveBatteryStateToFile(battery.getPercent());
-			
+			SaveBatteryStateToEventLog(battery.getPercent());
+			WriteRegistryStringValue(battery.getPercent());
 			CreateLogsWindow();
 			
 			InvalidateRect(childWindow, nullptr, TRUE);
