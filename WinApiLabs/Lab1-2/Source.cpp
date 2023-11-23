@@ -9,13 +9,17 @@ void MainWndAddWidgets(HWND hWnd);
 void MainWndAddButton(HWND hWnd);
 LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 DWORD WINAPI Power(LPVOID lpParameter);
+DWORD WINAPI PowerImage(LPVOID lpParameter);
 
 volatile bool isThreading = true;
 HANDLE readThread;
+HANDLE powerThread;
 HWND staticWindow;
 HWND childWindow;
 HWND logsWindow;
 int startPercent = 0;
+HANDLE fileMutex;
+
 
 using namespace Gdiplus;
 #pragma comment (lib,"Gdiplus.lib")
@@ -188,6 +192,7 @@ int CALLBACK wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLi
 	}
 
 	TerminateThread(readThread, 0);
+	TerminateThread(powerThread, 0);
 
 	GdiplusShutdown(gdiplusToken);
 
@@ -240,6 +245,7 @@ void CreateLogsWindow(HWND hWndParent)
 	wc.hbrBackground = CreateSolidBrush(RGB(240, 0, 240));
 	RegisterClassEx(&wc);
 
+	fileMutex = CreateMutex(NULL, FALSE, NULL);
 	HWND childwnd = CreateWindow(wc.lpszClassName, L"Logs Window", WS_OVERLAPPED | WS_CLIPCHILDREN  | ES_MULTILINE, 500, 500, 320, 420, hWndParent, nullptr, nullptr, nullptr);
 	
 	if (childwnd == nullptr)
@@ -247,6 +253,8 @@ void CreateLogsWindow(HWND hWndParent)
 		MessageBox(hWndParent, L"Failed to create logss window", L"Error", MB_OK | MB_ICONERROR);
 		return;
 	}
+
+
 
 	ShowWindow(childwnd, SW_SHOW);
 	UpdateWindow(childwnd);
@@ -265,6 +273,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		MainWndAddWidgets(hWnd);
 
 		readThread = CreateThread(nullptr, 0, Power, nullptr, 0, nullptr);
+		powerThread = CreateThread(nullptr, 0, Power, nullptr, 0, nullptr);
 	}
 	return 0;
 	/*case WM_PAINT:
@@ -296,6 +305,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	{
 		isThreading = false;
 		CloseHandle(readThread);
+		CloseHandle(powerThread);
 		PostQuitMessage(EXIT_SUCCESS);
 	}
 	return 0;
@@ -351,6 +361,7 @@ void MainWndAddButton(HWND hWnd)
 
 DWORD WINAPI Power(LPVOID lpParameter)
 {
+	WaitForSingleObject(fileMutex, INFINITE);
 	while (isThreading) {
 		Battery battery;
 
@@ -367,6 +378,29 @@ DWORD WINAPI Power(LPVOID lpParameter)
 		SetWindowTextA(staticWindow, BatteryStatus(battery).c_str());
 		Sleep(1000);
 	}
+	ReleaseMutex(fileMutex);
+	return 0;
+}
 
+
+DWORD WINAPI PowerImage(LPVOID lpParameter)
+{
+	WaitForSingleObject(fileMutex, INFINITE);
+
+	while (isThreading) {
+		Battery battery;
+
+		if (battery.getPercent() != startPercent)
+		{
+			CreateLogsWindow();
+
+			InvalidateRect(childWindow, nullptr, TRUE);
+		}
+		startPercent = battery.getPercent();
+		SetWindowTextA(staticWindow, BatteryStatus(battery).c_str());
+		Sleep(1000);
+	}
+
+	ReleaseMutex(fileMutex);
 	return 0;
 }
